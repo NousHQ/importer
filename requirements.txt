@@ -1,0 +1,10 @@
+functions-framework==3.*
+supabase
+aiofiles
+playwright
+weaviate-client==4.2b0
+pydantic-settings
+pydantic
+langchain
+fastapi
+uvicorn
