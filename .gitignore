@@ -6,3 +6,4 @@ notebooks/
 __pycache__/
 .env
 trace.zip
+setup.sh

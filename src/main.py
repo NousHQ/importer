@@ -67,14 +67,14 @@ def read_text_urls(url_l: list):
     return url_dicts
 
 
-@app.post("/")
+@app.post("/", status_code=201)
 async def root(webhookData: Payload, background_tasks: BackgroundTasks):
     url_l = extract_urls(webhookData)
     user_id = webhookData.record.user_id
     print(extract_urls(webhookData))
     background_tasks.add_task(worker, url_l, user_id)
     # print(await request.json())
-    return {"message": "Hello, FastAPI!"}
+    return {}
 
 async def worker(url_l: List, user_id: str):
 
@@ -128,8 +128,8 @@ async def worker(url_l: List, user_id: str):
                         "title": entry["title"],
                     }
 
-                    response = supabase.from_("all_saved").insert(data).execute()
-                    print(response)
+                    # response = supabase.from_("all_saved").insert(data).execute()
+                    # print(response)
                     logging.info("[!] Inserted into DB:")
                     
 
