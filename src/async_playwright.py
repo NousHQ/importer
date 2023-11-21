@@ -272,4 +272,4 @@ async def async_download_url_dicts(url_dict_l, log_filepath, tracing,
                 # Close
                 await context.close()
                 await browser.close()
-        
+                print("[!] Cleaning the browser")
