@@ -128,8 +128,8 @@ async def worker(url_l: List, user_id: str):
                         "title": entry["title"],
                     }
 
-                    # response = supabase.from_("all_saved").insert(data).execute()
-                    # print(response)
+                    response = supabase.from_("all_saved").insert(data).execute()
+                    print(response)
                     logging.info("[!] Inserted into DB:")
                     
 
