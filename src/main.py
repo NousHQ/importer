@@ -73,7 +73,6 @@ async def root(webhookData: Payload, background_tasks: BackgroundTasks):
     user_id = webhookData.record.user_id
     print(extract_urls(webhookData))
     background_tasks.add_task(worker, url_l, user_id)
-    # print(await request.json())
     return {}
 
 async def worker(url_l: List, user_id: str):
@@ -82,7 +81,6 @@ async def worker(url_l: List, user_id: str):
     url_dict_l = read_text_urls(url_l)
     num_urls = len(url_dict_l)
     logging.info("Read %d URLs" % (num_urls))
-
     user_dir = os.path.join(default_out_dir, user_id)
     user_out_dir = os.path.join(user_dir, "out")
     os.makedirs(user_out_dir, exist_ok=True)
@@ -95,43 +93,44 @@ async def worker(url_l: List, user_id: str):
                                                     log_file,
                                                     tracing=True,
                                                     out_dir=user_out_dir,
-                                                    timeout=default_timeout
+                                                    timeout=default_timeout,
+                                                    user_id=user_id
                                                 )
     await fun
 
-    client = weaviate.Client(
-        url = settings.WEAVIATE_URL,
-        auth_client_secret=weaviate.AuthApiKey(api_key=settings.WEAVIATE_API_KEY),
-        additional_headers={
-            "X-OpenAI-Api-Key": settings.OPENAI_API_KEY
-        }
-    )
-    with open(log_file, 'r') as f:
-        for line in f:
-            entry = json.loads(line)
-            if entry["download_status"] == 200:
-                file_name = f"{user_out_dir}/{entry['download_sha256']}.text"
-                with open(file_name, 'r') as f:
-                    content = f.read()
-                    document = dict()
-                    document["url"] = entry["url"]
-                    document["content"] = content
-                    document["title"] = entry["title"]
+    # client = weaviate.Client(
+    #     url = settings.WEAVIATE_URL,
+    #     auth_client_secret=weaviate.AuthApiKey(api_key=settings.WEAVIATE_API_KEY),
+    #     additional_headers={
+    #         "X-OpenAI-Api-Key": settings.OPENAI_API_KEY
+    #     }
+    # )
+    # with open(log_file, 'r') as f:
+    #     for line in f:
+    #         entry = json.loads(line)
+    #         if entry["download_status"] == 200:
+    #             file_name = f"{user_out_dir}/{entry['download_sha256']}.text"
+    #             with open(file_name, 'r') as f:
+    #                 content = f.read()
+    #                 document = dict()
+    #                 document["url"] = entry["url"]
+    #                 document["content"] = content
+    #                 document["title"] = entry["title"]
                     
-                    logging.info(f"[*] Indexing {entry['url']}")
+    #                 logging.info(f"[*] Indexing {entry['url']}")
                     
-                    indexer(document, user_id, client)
+    #                 indexer(document, user_id, client)
 
-                    data = {
-                        "user_id": convert_user_id(user_id),
-                        "url": entry["url"],
-                        "title": entry["title"],
-                    }
+    #                 data = {
+    #                     "user_id": convert_user_id(user_id),
+    #                     "url": entry["url"],
+    #                     "title": entry["title"],
+    #                 }
 
-                    response = supabase.from_("all_saved").insert(data).execute()
-                    print(response)
-                    logging.info("[!] Inserted into DB:")
+    #                 response = supabase.from_("all_saved").insert(data).execute()
+    #                 print(response)
+    #                 logging.info("[!] Inserted into DB:")
                     
 
-            else:
-                logging.info(f"[!] Failed content. Importing {entry['url']}")
+    #         else:
+    #             logging.info(f"[!] Failed content. Importing {entry['url']}")
