@@ -155,7 +155,8 @@ async def async_download_url_in_context(context, url, user_id,
 
     # Check status code
     data['download_status'] = response.status
-    data['title'] = await page.title()
+    title = await page.title()
+    data['title'] = title if title else url
     webhash = hashlib.sha256(url.encode('utf-8')).hexdigest()
     data['download_sha256'] = webhash
 
