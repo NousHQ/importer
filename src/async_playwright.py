@@ -5,11 +5,12 @@ import json
 import asyncio
 import random
 import aiofiles
+import aiohttp
 from playwright.async_api import async_playwright, Page
+from config import settings
 
 from indexer import indexer
-from utils import get_supabase, get_weaviate_client, convert_user_id
-from supabase import Client
+from utils import get_weaviate_client, convert_user_id
 # from playwright_stealth import stealth_async
 
 # Set logging
@@ -82,15 +83,17 @@ async def async_download_url_dicts(url_dict_l, log_filepath, tracing,
 
                 # Create futures
                 download_futures = []
-                for url_dict in batch_l:
-                    download_futures.append(
-                        async_download_url_in_context(
-                            context, url_dict['url'], user_id=user_id,
-                            url_dict=url_dict,
-                            out_dir=out_dir,
-                            timeout=timeout
+                async with aiohttp.ClientSession() as session:
+                    for url_dict in batch_l:
+                        download_futures.append(
+                            async_download_url_in_context(
+                                context, url_dict['url'], session,
+                                user_id=user_id,
+                                url_dict=url_dict,
+                                out_dir=out_dir,
+                                timeout=timeout,
+                            )
                         )
-                    )
 
                 # Run futures and print them as they complete
                 for future in asyncio.as_completed(_limit_concurrency(
@@ -113,10 +116,11 @@ async def async_download_url_dicts(url_dict_l, log_filepath, tracing,
 
 
 async def async_download_url_in_context(context, url, user_id,
-                                  out_dir=".",
-                                  get_text=True,
-                                  timeout=None,
-                                  url_dict=None
+                                    session,
+                                    out_dir=".",
+                                    get_text=True,
+                                    timeout=None,
+                                    url_dict=None
                                 ):
     data = url_dict or {}
 
@@ -225,7 +229,7 @@ async def async_download_url_in_context(context, url, user_id,
         return pageContent
 
     # Usage
-    pageContent = None
+    pageContent = ""
     try:
         pageContent = await extract_with_readability(page, webhash, out_dir)
         # print(pageContent)
@@ -246,9 +250,8 @@ async def async_download_url_in_context(context, url, user_id,
 
     document = dict()
     client = get_weaviate_client()
-    supabase: Client = get_supabase()
     document["url"] = url
-    document["content"] = pageContent if pageContent else ""
+    document["content"] = pageContent
     document["title"] = data['title']
     indexer(document, user_id, client)
 
@@ -257,12 +260,26 @@ async def async_download_url_in_context(context, url, user_id,
         "url": url,
         "title": data['title']
     }
+    headers = {
+        "apikey": settings.SUPABASE_SERVICE_KEY,
+        "Authorization": f"Bearer {settings.SUPABASE_SERVICE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal"
+    }
+
     try:
-        response = supabase.from_("all_saved").insert(data).execute()
-        print(response)
-        logging.info("[!] Inserted into DB:")
+        async with session.post('https://mzaeulqqzucqbiovkgzg.supabase.co/rest/v1/all_saved', headers=headers, data=json.dumps(data)) as response:
+            print(await response.text())
+            logging.info("[!] Inserted into DB:")
     except Exception as e:
         logging.info("[!] Failed to insert into DB:", e)
+
+    # try:
+    #     response = supabase.from_("all_saved").insert(data).execute()
+    #     print(response)
+    #     logging.info("[!] Inserted into DB:")
+    # except Exception as e:
+    #     logging.info("[!] Failed to insert into DB:", e)
 
     # Compute SHA256 hash of downloaded document and url
     num_bytes = len(pageContent)

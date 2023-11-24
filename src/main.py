@@ -46,6 +46,7 @@ def extract_urls(payload: Payload) -> List[str]:
         for link in links:
             if link.url:
                 urls.append(link.url)
+                
             if link.links:
                 traverse_links(link.links)
 
