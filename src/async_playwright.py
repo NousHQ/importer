@@ -129,30 +129,32 @@ async def async_download_url_in_context(context, url, user_id,
         timeout=0
 
     # Visit URL
-    try:
-        page: Page = await context.new_page()
-        # await stealth_async(page)
+    max_retries = 3  # Set the maximum number of retries
 
-        response = await page.goto(url, timeout=timeout)
-        await page.wait_for_load_state("domcontentloaded", timeout=timeout)
-        # try:
-        #     await page.wait_for_navigation(timeout=500)
-        # except asyncio.TimeoutError:
-        #     pass
+    for i in range(max_retries):
+        try:
+            page: Page = await context.new_page()
+            response = await page.goto(url, timeout=timeout, wait_until='domcontentloaded')
 
-    except asyncio.TimeoutError as e:
-        log.info(u"Timeout downloading %s with exception: %s" % (
-                  url, e))
-        data['download_status'] = -1
-        data['error'] = f"TimeoutError: {str(e)}"
+            # If the page loading is successful, break the loop
+            break
 
-    except Exception as e:
-        log.info(u"Failed to establish session %s with exception: %s" % (
-                  url, e))
-        data['download_status'] = -1
-        data['error'] = f"ConnectionError: {str(e)}"
-        return data
+        except asyncio.TimeoutError as e:
+            log.info(u"Timeout downloading %s with exception: %s" % (url, e))
+            data['download_status'] = -1
+            data['error'] = f"TimeoutError: {str(e)}"
 
+        except Exception as e:
+            log.info(u"Failed to establish session %s with exception: %s" % (url, e))
+            data['download_status'] = -1
+            data['error'] = f"ConnectionError: {str(e)}"
+
+            # If this was the last retry, return the data
+            if i == max_retries - 1:
+                return data
+
+            # Otherwise, log the retry and continue the loop
+            log.info(f"Retrying to establish session for {url}. Retry {i+1} of {max_retries}")
     # Check status code
     data['download_status'] = response.status
     title = await page.title()
