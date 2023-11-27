@@ -1,4 +1,5 @@
-from fastapi import (FastAPI, Request, BackgroundTasks)
+# from fastapi import (FastAPI, Request, BackgroundTasks)
+import asyncio
 import json
 import sys
 import os
@@ -7,10 +8,15 @@ from supabase import Client, create_client
 import weaviate
 from config import settings
 from indexer import indexer
-from schemas import (Payload, Link, Bookmark, Record)
+# from schemas import (Payload, Link, Bookmark, Record)
 from typing import List, Optional
+
+import warnings
+
+warnings.filterwarnings("ignore")
+
 # Create an instance of the FastAPI class
-app = FastAPI()
+# app = FastAPI()
 
 # Add a route to the app
 default_out_dir = "./results"
@@ -39,19 +45,20 @@ def convert_user_id(user_id: str):
         return user_id
 
 
-def extract_urls(payload: Payload) -> List[str]:
+def extract_urls(payload: dict) -> List[str]:
     urls = []
 
-    def traverse_links(links: List[Link]):
+    def traverse_links(links):
         for link in links:
-            if link.url:
-                urls.append(link.url)
-                
-            if link.links:
-                traverse_links(link.links)
+            if link['url']:
+                urls.append(link['url'])
 
-    for bookmark in payload.record.bookmarks:
-        traverse_links(bookmark.links)
+            if link['links']:
+                traverse_links(link['links'])
+
+    # for bookmark in payload.record.bookmarks:
+    for bookmark in payload['record']['bookmarks']:
+        traverse_links(bookmark['links'])
 
     return urls
 
@@ -67,17 +74,7 @@ def read_text_urls(url_l: list):
     # Return URL dictionaries
     return url_dicts
 
-
-@app.post("/", status_code=201)
-async def root(webhookData: Payload, background_tasks: BackgroundTasks):
-    url_l = extract_urls(webhookData)
-    user_id = webhookData.record.user_id
-    print(extract_urls(webhookData))
-    background_tasks.add_task(worker, url_l, user_id)
-    return {}
-
 async def worker(url_l: List, user_id: str):
-
     user_id = convert_user_id(user_id)
     url_dict_l = read_text_urls(url_l)
     num_urls = len(url_dict_l)
@@ -92,46 +89,17 @@ async def worker(url_l: List, user_id: str):
 
     fun = async_playwright.async_download_url_dicts(url_dict_l,
                                                     log_file,
+                                                    user_id=user_id,
                                                     tracing=True,
                                                     out_dir=user_out_dir,
                                                     timeout=default_timeout,
-                                                    user_id=user_id
                                                 )
     await fun
 
-    # client = weaviate.Client(
-    #     url = settings.WEAVIATE_URL,
-    #     auth_client_secret=weaviate.AuthApiKey(api_key=settings.WEAVIATE_API_KEY),
-    #     additional_headers={
-    #         "X-OpenAI-Api-Key": settings.OPENAI_API_KEY
-    #     }
-    # )
-    # with open(log_file, 'r') as f:
-    #     for line in f:
-    #         entry = json.loads(line)
-    #         if entry["download_status"] == 200:
-    #             file_name = f"{user_out_dir}/{entry['download_sha256']}.text"
-    #             with open(file_name, 'r') as f:
-    #                 content = f.read()
-    #                 document = dict()
-    #                 document["url"] = entry["url"]
-    #                 document["content"] = content
-    #                 document["title"] = entry["title"]
-                    
-    #                 logging.info(f"[*] Indexing {entry['url']}")
-                    
-    #                 indexer(document, user_id, client)
 
-    #                 data = {
-    #                     "user_id": convert_user_id(user_id),
-    #                     "url": entry["url"],
-    #                     "title": entry["title"],
-    #                 }
-
-    #                 response = supabase.from_("all_saved").insert(data).execute()
-    #                 print(response)
-    #                 logging.info("[!] Inserted into DB:")
-                    
-
-    #         else:
-    #             logging.info(f"[!] Failed content. Importing {entry['url']}")
+def importer(webhookData: dict):
+    # print("Importing data")
+    print(webhookData)
+    url_l = extract_urls(webhookData)
+    user_id = webhookData['record']['user_id']
+    asyncio.run(worker(url_l, user_id))

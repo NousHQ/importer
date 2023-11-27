@@ -87,7 +87,7 @@ async def async_download_url_dicts(url_dict_l, log_filepath, tracing,
                     for url_dict in batch_l:
                         download_futures.append(
                             async_download_url_in_context(
-                                context, url_dict['url'], session,
+                                context=context, url=url_dict['url'], session=session,
                                 user_id=user_id,
                                 url_dict=url_dict,
                                 out_dir=out_dir,
@@ -96,14 +96,14 @@ async def async_download_url_dicts(url_dict_l, log_filepath, tracing,
                         )
 
                 # Run futures and print them as they complete
-                for future in asyncio.as_completed(_limit_concurrency(
-                        download_futures, max_simultaneous_downloads)):
-                    # Wait for URL visit to complete
-                    data = await future
-                    # Output log info
-                    line = json.dumps(data, sort_keys=True, default=str)
-                    await log_fd.write("%s\n" % line)
-                    await log_fd.flush()
+                    for future in asyncio.as_completed(_limit_concurrency(
+                            download_futures, max_simultaneous_downloads)):
+                        # Wait for URL visit to complete
+                        data = await future
+                        # Output log info
+                        line = json.dumps(data, sort_keys=True, default=str)
+                        await log_fd.write("%s\n" % line)
+                        await log_fd.flush()
 
                 # Stop tracing and export it into a zip archive.
                 if tracing:
@@ -194,7 +194,7 @@ async def async_download_url_in_context(context, url, user_id,
         filename = "%s.text" % webhash
         filepath = os.path.join(out_dir, filename)
         readability_path = "node_modules/@mozilla/readability/Readability.js"
-        page_text = None
+        page_text = ""
         with open(readability_path, "r") as fd:
             readability_script = fd.read()
         # Inject the Readability library into the page
@@ -207,15 +207,12 @@ async def async_download_url_in_context(context, url, user_id,
             }"""
         )
         if readability_response:
-            page_text = readability_response.get('textContent', None)
-            if page_text:
-                # print(page_text)
-                async with aiofiles.open(filepath, "w") as download_fd:
-                    await download_fd.write(page_text.strip())
-                
-                log.info(u"Downloaded %s into %s" % (url, filepath))
-                return page_text
-        return None
+            page_text = readability_response.get('textContent', "")
+            async with aiofiles.open(filepath, "w") as download_fd:
+                await download_fd.write(page_text.strip())
+            
+            log.info(u"Downloaded %s into %s" % (url, filepath))
+            return page_text
 
     async def extract_raw_content(page, webhash, out_dir):
         filename = "%s.text" % webhash
