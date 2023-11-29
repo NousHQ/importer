@@ -26,13 +26,13 @@ default_rest = 10
 default_timeout = 60
 # default_out_filepath = os.path.join(, "downloads.jsonl")
 
-log = logging.getLogger(__name__)
-formatter = logging.Formatter(u'%(message)s')
-handler_stderr = logging.StreamHandler(sys.stderr)
-handler_stderr.setFormatter(formatter)
-root = logging.getLogger()
-root.setLevel(logging.INFO)
-root.addHandler(handler_stderr)
+# log = logging.getLogger(__name__)
+# formatter = logging.Formatter(u'%(message)s')
+# handler_stderr = logging.StreamHandler(sys.stderr)
+# handler_stderr.setFormatter(formatter)
+# root = logging.getLogger()
+# root.setLevel(logging.INFO)
+# root.addHandler(handler_stderr)
 
 supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
 
@@ -51,7 +51,7 @@ def extract_urls(payload: dict) -> List[str]:
     def traverse_links(links):
         for link in links:
             if link['url']:
-                urls.append(link['url'])
+                urls.append({'url': link['url'], 'title': link['name']})
 
             if link['links']:
                 traverse_links(link['links'])
@@ -74,9 +74,8 @@ def read_text_urls(url_l: list):
     # Return URL dictionaries
     return url_dicts
 
-async def worker(url_l: List, user_id: str):
+async def worker(url_dict_l: dict, user_id: str):
     user_id = convert_user_id(user_id)
-    url_dict_l = read_text_urls(url_l)
     num_urls = len(url_dict_l)
     logging.info("Read %d URLs" % (num_urls))
     user_dir = os.path.join(default_out_dir, user_id)
@@ -90,7 +89,7 @@ async def worker(url_l: List, user_id: str):
     fun = async_playwright.async_download_url_dicts(url_dict_l,
                                                     log_file,
                                                     user_id=user_id,
-                                                    tracing=True,
+                                                    tracing=False,
                                                     out_dir=user_out_dir,
                                                     timeout=default_timeout,
                                                 )
@@ -99,7 +98,6 @@ async def worker(url_l: List, user_id: str):
 
 def importer(webhookData: dict):
     # print("Importing data")
-    print(webhookData)
-    url_l = extract_urls(webhookData)
+    url_dict_l = extract_urls(webhookData)
     user_id = webhookData['record']['user_id']
-    asyncio.run(worker(url_l, user_id))
+    asyncio.run(worker(url_dict_l, user_id))
