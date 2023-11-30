@@ -4,7 +4,6 @@ import json
 import sys
 import os
 import logging
-from supabase import Client, create_client
 import weaviate
 from config import settings
 from indexer import indexer
@@ -12,6 +11,8 @@ from indexer import indexer
 from typing import List, Optional
 
 import warnings
+
+from utils import get_supabase
 
 warnings.filterwarnings("ignore")
 
@@ -34,7 +35,6 @@ default_timeout = 60
 # root.setLevel(logging.INFO)
 # root.addHandler(handler_stderr)
 
-supabase: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
 
 def convert_user_id(user_id: str):
     if "-" in user_id:
@@ -100,4 +100,7 @@ def importer(webhookData: dict):
     # print("Importing data")
     url_dict_l = extract_urls(webhookData)
     user_id = webhookData['record']['user_id']
+    job_id = webhookData['record']['id']
     asyncio.run(worker(url_dict_l, user_id))
+    supabase = get_supabase()
+    supabase.from_("imported_bookmarks").update({"is_job_finished": True}).eq("id", job_id).execute()

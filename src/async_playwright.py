@@ -17,7 +17,6 @@ from utils import get_weaviate_client, convert_user_id, get_supabase
 log = logging.getLogger(__name__)
 
 # Global maps of downloads
-downloaded_files = {}
 
 # Tracing parameters
 tracing_enabled = False
@@ -57,10 +56,17 @@ async def async_download_url_dicts(url_dict_l, log_filepath, tracing,
 
                 browser_type = p.chromium
                 browser = await browser_type.launch(
-                                  args=['--disable-blink-features=TrustedDOMTypes'],
-                                  headless=True,
-                                  downloads_path=out_dir)
-
+                                    proxy = {
+                                        "server": "https://brd.superproxy.io:22225",
+                                        "username": "brd-customer-hl_3251280c-zone-data_center",
+                                        "password": "03kqenast9p6"
+                                        # "username": "brd-customer-hl_3251280c-zone-isp",
+                                        # "password": "e786cyuj4mn0"
+                                    },
+                                    args=['--disable-blink-features=TrustedDOMTypes'],
+                                    headless=True,
+                                    downloads_path=out_dir
+                                )
 
                 context = await browser.new_context(accept_downloads=False,
                                                     # locale='en-US',
@@ -82,29 +88,25 @@ async def async_download_url_dicts(url_dict_l, log_filepath, tracing,
                             timeout=timeout,
                         )
                     )
-                    print(url_dict)
                 for future in asyncio.as_completed(_limit_concurrency(
                         download_futures, max_simultaneous_downloads)):
+                    data, pageContent = await future
                     client = get_weaviate_client()
                     supabase = get_supabase()
-
-                    data, pageContent = await future
-                    
                     document = dict()
-                    document["url"] = url_dict.get('url')
+                    document["url"] = data.get('url')
                     document["content"] = pageContent
-                    document["title"] = url_dict.get('title')
-                    print(document)
+                    document["title"] = data.get('title')
                     # indexer(document, user_id, client)
                     response = supabase.from_("all_saved").insert(
                          {
                             "user_id": convert_user_id(user_id),
-                            "url": url_dict.get('url'),
-                            "title": url_dict.get('title')
+                            "url": data.get('url'),
+                            "title": data.get('title')
                         }
                     ).execute()
 
-
+                    log.info(f"[!] Imported {data.get('url')}")
                     line = json.dumps(data, sort_keys=True, default=str)
                     await log_fd.write("%s\n" % line)
                     await log_fd.flush()
@@ -144,11 +146,10 @@ async def extract_raw_content(page, webhash, out_dir):
     filename = "%s.text" % webhash
     filepath = os.path.join(out_dir, filename)
     pageContent = await page.evaluate('() => document.body.innerText')
-    # bin_content = pageContent.encode('utf-8')
-    # print(bin_content)
-    async with aiofiles.open(filepath, "wb") as download_fd:
-        await download_fd.write(pageContent)
-    return pageContent
+    if pageContent is None:
+        return ""
+    else:
+        return pageContent
 
 
 async def async_download_url_in_context(context,
@@ -160,7 +161,7 @@ async def async_download_url_in_context(context,
     url = url_dict.get('url')
     data = url_dict or {}
     pageContent = ""
-    log.debug("Downloading: %s" % url)
+    log.debug(f"[!] Started import: {url}")
     # Set timeout (in milliseconds)
     if timeout is not None:
         timeout=timeout*1000
@@ -214,11 +215,13 @@ async def async_download_url_in_context(context,
         data['error'] = "Closed page"
         return data, pageContent
 
-
-    pageContent = await extract_with_readability(page, webhash, out_dir)
-    if not pageContent.strip():
-        pageContent = await extract_raw_content(page, webhash, out_dir)
-
+    try: 
+        pageContent = await extract_with_readability(page, webhash, out_dir)
+        if not pageContent or pageContent.strip() == "":
+            pageContent = await extract_raw_content(page, webhash, out_dir)
+    except Exception as e:
+        log.info(f"Failed to extract page content for {url} with exception: {e}")
+    
     num_bytes = len(pageContent)
 
     log.info(f"Extracted pageContent for {url} with length: {num_bytes}")
