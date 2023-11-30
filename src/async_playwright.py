@@ -185,9 +185,11 @@ async def async_download_url_in_context(context,
 
         except Exception as e:
             log.info(u"Failed to establish session %s with exception: %s" % (url, e))
-            data['download_status'] = -1
+            if 'response' in locals() and hasattr(response, 'status'):
+                data['download_status'] = response.status
+            else:
+                data['download_status'] = -2
             data['error'] = f"ConnectionError: {str(e)}"
-
             # If this was the last retry, return the data
             if i == max_retries - 1:
                 return data, pageContent
