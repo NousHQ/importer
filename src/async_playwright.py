@@ -97,14 +97,14 @@ async def async_download_url_dicts(url_dict_l, log_filepath, tracing,
                     document["url"] = data.get('url')
                     document["content"] = pageContent
                     document["title"] = data.get('title')
-                    # indexer(document, user_id, client)
-                    response = supabase.from_("all_saved").insert(
+                    response = supabase.from_("saved_uris").insert(
                          {
                             "user_id": convert_user_id(user_id),
                             "url": data.get('url'),
                             "title": data.get('title')
                         }
                     ).execute()
+                    indexer(document, user_id, client)
 
                     log.info(f"[!] Imported {data.get('url')}")
                     line = json.dumps(data, sort_keys=True, default=str)
@@ -223,6 +223,8 @@ async def async_download_url_in_context(context,
             pageContent = await extract_raw_content(page, webhash, out_dir)
     except Exception as e:
         log.info(f"Failed to extract page content for {url} with exception: {e}")
+        # fix this, why exceptions happen sometimes.
+        # authenticate pages most of the time
     
     num_bytes = len(pageContent)
 
