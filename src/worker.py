@@ -3,7 +3,7 @@ from rq import Worker, Queue
 import redis
 
 if __name__ == '__main__':
-    redis_host = '127.0.0.1'
+    redis_host = '10.160.0.3'
     redis_port = 6379  # Default Redis port
 
     # If you've set a password for your Redis instance, include it
