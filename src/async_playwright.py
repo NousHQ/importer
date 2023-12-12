@@ -99,16 +99,18 @@ async def async_download_url_dicts(url_dict_l, log_filepath, tracing,
                     document["title"] = data.get('title')
                     parent_uuid = indexer(document, user_id, client)
                     print(parent_uuid)
-                    response = supabase.from_("saved_uris").insert(
-                        {
-                            "id": parent_uuid,
-                            "user_id": convert_user_id(user_id),
-                            "url": data.get('url'),
-                            "title": data.get('title')
-                        }
-                    ).execute()
-                    print(response)
-
+                    try:
+                        response = supabase.from_("saved_uris").insert(
+                            {
+                                "id": parent_uuid,
+                                "user_id": convert_user_id(user_id),
+                                "url": data.get('url'),
+                                "title": data.get('title')
+                            }
+                        ).execute()
+                        print(response)
+                    except Exception as e:
+                        log.info(f"Failed to insert {data.get('url')} with exception: {e}")
                     log.info(f"[!] Imported {data.get('url')}")
                     line = json.dumps(data, sort_keys=True, default=str)
                     await log_fd.write("%s\n" % line)
