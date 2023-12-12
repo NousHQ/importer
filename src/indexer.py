@@ -67,4 +67,4 @@ def indexer(document: dict, user_id: str, client: Client):
         log.error(f"Error {e} in indexing {uri} for {user_id}")
         pass
 
-    return True
+    return parent_uuid
