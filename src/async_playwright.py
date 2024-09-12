@@ -12,7 +12,11 @@ from config import settings
 from indexer import indexer
 from utils import get_weaviate_client, convert_user_id, get_supabase
 # from playwright_stealth import stealth_async
+import os
+from dotenv import load_dotenv
 
+
+load_dotenv()
 # Set logging
 log = logging.getLogger(__name__)
 
@@ -57,11 +61,9 @@ async def async_download_url_dicts(url_dict_l, log_filepath, tracing,
                 browser_type = p.chromium
                 browser = await browser_type.launch(
                                     proxy = {
-                                        "server": "https://brd.superproxy.io:22225",
-                                        "username": "brd-customer-hl_3251280c-zone-data_center",
-                                        "password": "03kqenast9p6"
-                                        # "username": "brd-customer-hl_3251280c-zone-isp",
-                                        # "password": "e786cyuj4mn0"
+                                        "server": os.environ.get("PROXY_SERVER")
+                                        "username": os.environ.get("PROXY_USER")
+                                        "password": os.environ.get("PROXY_PASSWORD")
                                     },
                                     args=['--disable-blink-features=TrustedDOMTypes'],
                                     headless=True,
